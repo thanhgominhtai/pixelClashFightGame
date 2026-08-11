@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/assets/(.*)", "destination": "/Character_platformer/$1" },
+    { "source": "/backgrounds/(.*)", "destination": "/backgound_map/$1" },
+    { "source": "/common-vfx/(.*)", "destination": "/vfx/$1" },
+    { "source": "/sounds/(.*)", "destination": "/400 Sounds Pack/$1" },
+    { "source": "/shared/(.*)", "destination": "/public/shared/$1" },
+    { "source": "/", "destination": "/public/index.html" },
+    { "source": "/(.*)", "destination": "/public/$1" }
+  ]
+}

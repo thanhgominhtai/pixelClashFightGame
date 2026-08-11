@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4e7c6">
+  <meta name="description" content="Pixel Clash Dojo — prototype game đối kháng 2D 1v1 chạy trên Phaser 3 và Socket.io.">
+  <meta property="og:title" content="Pixel Clash Dojo">
+  <meta property="og:description" content="Chọn đấu sĩ, vào training hoặc đấu 1v1 trên trình duyệt.">
+  <title>Pixel Clash Dojo</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito+Sans:opsz,wght@6..12,500;6..12,600;6..12,700;6..12,800&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=3.1.6">
+</head>
+<body>
+  <section id="game-intro" class="game-intro" role="dialog" aria-modal="true" aria-label="Intro Pixel Clash">
+    <video id="game-intro-video" class="game-intro-video" autoplay playsinline preload="auto">
+      <source src="/intro/introGame.mp4?v=3.1.6" type="video/mp4">
+    </video>
+  </section>
+
+  <a class="skip-link" href="#main-content">Bỏ qua đến nội dung chính</a>
+
+  <div id="app" class="app-shell" inert>
+    <header class="site-bar" aria-label="Thanh điều hướng">
+      <button id="brand-home" class="brand-lockup" type="button" aria-label="Về menu chính">
+        <span class="brand-mark" aria-hidden="true">PC</span>
+        <span>
+          <strong>Pixel Clash</strong>
+          <small>combat dojo · v3.1.6</small>
+        </span>
+      </button>
+
+      <div class="site-actions">
+        <span id="connection-status" class="status-chip" data-state="connecting">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>Đang kết nối</span>
+        </span>
+        <button id="global-guide" class="icon-text-button" type="button" title="Hướng dẫn phím (H)">
+          <span class="keycap">H</span><span>Phím</span>
+        </button>
+        <button id="global-fullscreen" class="icon-text-button" type="button" title="Toàn màn hình (F)">
+          <span aria-hidden="true">⛶</span><span>Toàn màn hình</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section id="menu-screen" class="screen menu-screen" aria-labelledby="menu-title">
+        <div class="menu-cloud menu-cloud--one" aria-hidden="true"></div>
+        <div class="menu-cloud menu-cloud--two" aria-hidden="true"></div>
+
+        <div class="menu-layout">
+          <section class="mission-board">
+            <header class="mission-heading">
+              <div>
+                <p class="eyebrow">Browser fighter prototype</p>
+                <h1 id="menu-title">Pixel Clash<br><span>Dojo</span></h1>
+              </div>
+              <p class="mission-copy">Chọn chế độ, khóa đúng asset của từng đấu sĩ rồi vào sân. Combat được server tính ở 60 khung logic mỗi giây.</p>
+            </header>
+
+            <nav class="mode-strip" aria-label="Chọn chế độ chơi">
+              <button class="mode-card is-active" type="button" data-mode="training" aria-pressed="true">
+                <span class="mode-icon" aria-hidden="true">◎</span>
+                <span><strong>Training</strong><small>Test frame & hitbox</small></span>
+              </button>
+              <button class="mode-card" type="button" data-mode="pve" aria-pressed="false">
+                <span class="mode-icon" aria-hidden="true">AI</span>
+                <span><strong>Đấu máy</strong><small>Dễ đến khó</small></span>
+              </button>
+              <button class="mode-card" type="button" data-mode="online-create" aria-pressed="false">
+                <span class="mode-icon" aria-hidden="true">+</span>
+                <span><strong>Tạo phòng</strong><small>Nhận mã 4 số</small></span>
+              </button>
+              <button class="mode-card" type="button" data-mode="online-join" aria-pressed="false">
+                <span class="mode-icon" aria-hidden="true">↳</span>
+                <span><strong>Vào phòng</strong><small>Nhập mã bạn bè</small></span>
+              </button>
+            </nav>
+
+            <div class="setup-grid">
+              <section class="fighter-pick" aria-labelledby="p1-pick-title">
+                <div class="section-label">
+                  <span>P1</span>
+                  <div><strong id="p1-pick-title">Đấu sĩ của bạn</strong><small>A/D · Space · J K · S đỡ · W roll · L I U</small></div>
+                </div>
+                <div class="character-grid" data-picker="p1">
+                  <button class="fighter-card is-selected" type="button" data-character="buck" aria-pressed="true">
+                    <span class="fighter-portrait fighter-portrait--buck" aria-hidden="true"></span>
+                    <span class="fighter-meta"><strong>Buck Borris</strong><small>Power · charge</small></span>
+                    <span class="check-mark" aria-hidden="true">✓</span>
+                  </button>
+                  <button class="fighter-card" type="button" data-character="rogue" aria-pressed="false">
+                    <span class="fighter-portrait fighter-portrait--rogue" aria-hidden="true"></span>
+                    <span class="fighter-meta"><strong>Fantasy Rogue</strong><small>Speed · trick</small></span>
+                    <span class="check-mark" aria-hidden="true">✓</span>
+                  </button>
+                </div>
+              </section>
+
+              <section id="p2-picker-section" class="fighter-pick" aria-labelledby="p2-pick-title">
+                <div class="section-label">
+                  <span>P2</span>
+                  <div><strong id="p2-pick-title">Đối thủ</strong><small id="p2-control-label">Dummy training</small></div>
+                </div>
+                <div class="character-grid" data-picker="p2">
+                  <button class="fighter-card" type="button" data-character="buck" aria-pressed="false">
+                    <span class="fighter-portrait fighter-portrait--buck" aria-hidden="true"></span>
+                    <span class="fighter-meta"><strong>Buck Borris</strong><small>Power · charge</small></span>
+                    <span class="check-mark" aria-hidden="true">✓</span>
+                  </button>
+                  <button class="fighter-card is-selected" type="button" data-character="rogue" aria-pressed="true">
+                    <span class="fighter-portrait fighter-portrait--rogue" aria-hidden="true"></span>
+                    <span class="fighter-meta"><strong>Fantasy Rogue</strong><small>Speed · trick</small></span>
+                    <span class="check-mark" aria-hidden="true">✓</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <section id="ai-difficulty-field" class="ai-difficulty-field" aria-labelledby="ai-difficulty-title" hidden>
+              <div class="difficulty-heading">
+                <span aria-hidden="true">CPU</span>
+                <div>
+                  <strong id="ai-difficulty-title">Chọn cấp độ máy</strong>
+                  <small>AI phản ứng nhanh và phối hợp chiêu tốt hơn theo từng cấp.</small>
+                </div>
+              </div>
+              <div class="difficulty-options" role="group" aria-label="Độ khó PvE">
+                <button class="difficulty-button" type="button" data-difficulty="easy" aria-pressed="false">
+                  <span class="difficulty-rank">I</span><span><strong>Dễ</strong><small>Học cách né và phản công</small></span>
+                </button>
+                <button class="difficulty-button is-selected" type="button" data-difficulty="normal" aria-pressed="true">
+                  <span class="difficulty-rank">II</span><span><strong>Vừa</strong><small>Biết đỡ, lướt và dùng special</small></span>
+                </button>
+                <button class="difficulty-button" type="button" data-difficulty="hard" aria-pressed="false">
+                  <span class="difficulty-rank">III</span><span><strong>Khó</strong><small>Phản ứng nhanh, gây áp lực liên tục</small></span>
+                </button>
+              </div>
+            </section>
+
+            <section id="map-picker-field" class="map-picker-field" aria-labelledby="map-picker-title">
+              <header class="map-picker-heading">
+                <div>
+                  <span class="map-seal" aria-hidden="true">地</span>
+                  <div><strong id="map-picker-title">Chọn chiến địa</strong><small>Map có bệ là địa hình gameplay thật, đứng và giao chiến được.</small></div>
+                </div>
+                <div class="map-picker-tools">
+                  <p id="selected-map-summary"><strong>Sa mạc Thiên Sơn</strong><span>Sàn phẳng · luyện spacing</span></p>
+                  <div class="map-rail-controls" aria-label="Duyệt danh sách chiến địa">
+                    <button id="map-rail-prev" type="button" aria-label="Xem map phía trước">‹</button>
+                    <button id="map-rail-next" type="button" aria-label="Xem map tiếp theo">›</button>
+                  </div>
+                </div>
+              </header>
+              <div class="map-card-rail" role="radiogroup" aria-label="Danh sách chiến địa">
+                <button class="map-card is-selected" type="button" data-map="desert" role="radio" aria-checked="true">
+                  <img src="/backgrounds/BG_DesertMountains/background1.png" alt="" loading="eager">
+                  <span class="map-card-shade"></span><span class="map-card-copy"><strong>Sa mạc Thiên Sơn</strong><small>Phẳng · cơ bản</small></span>
+                </button>
+                <button class="map-card" type="button" data-map="ancientForest" role="radio" aria-checked="false">
+                  <img src="/backgrounds/Free Pixel Art Forest/Free Pixel Art Forest/Preview/Background.png" alt="" loading="eager">
+                  <span class="map-card-shade"></span><span class="map-card-copy"><strong>Rừng Cổ Thụ</strong><small>5 bệ cỏ</small></span>
+                </button>
+                <button class="map-card" type="button" data-map="glacial" role="radio" aria-checked="false">
+                  <img src="/backgrounds/Glacial-mountains-parallax-background_vnitti_v3/Glacial-mountains-parallax-background_vnitti/background_glacial_mountains_lightened.png" alt="" loading="eager">
+                  <span class="map-card-shade"></span><span class="map-card-copy"><strong>Đỉnh Băng Lam</strong><small>Cầu băng</small></span>
+                </button>
+                <button class="map-card" type="button" data-map="pinePeak" role="radio" aria-checked="false">
+                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_3/origbig.png" alt="" loading="eager">
+                  <span class="map-card-shade"></span><span class="map-card-copy"><strong>Chân Núi Tùng</strong><small>Hai tháp đấu</small></span>
+                </button>
+                <button class="map-card" type="button" data-map="meadow" role="radio" aria-checked="false">
+                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_2/origbig.png" alt="" loading="eager">
+                  <span class="map-card-shade"></span><span class="map-card-copy"><strong>Đồng Cỏ Gió</strong><small>3 đảo cỏ</small></span>
+                </button>
+                <button class="map-card" type="button" data-map="aurora" role="radio" aria-checked="false">
+                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_6/origbig.png" alt="" loading="eager">
+                  <span class="map-card-shade"></span><span class="map-card-copy"><strong>Cực Quang Dạ</strong><small>Tháp 5 tầng</small></span>
+                </button>
+                <button class="map-card" type="button" data-map="coast" role="radio" aria-checked="false">
+                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_8/origbig.png" alt="" loading="eager">
+                  <span class="map-card-shade"></span><span class="map-card-copy"><strong>Vịnh Đá Trắng</strong><small>Cầu đá so le</small></span>
+                </button>
+              </div>
+              <p id="map-guest-note" class="map-guest-note" hidden>Người tạo phòng sẽ chọn map; khi vào phòng máy bạn tự tải đúng chiến địa đó.</p>
+            </section>
+
+            <div id="room-code-field" class="room-code-field" hidden>
+              <label for="room-code-input">Mã phòng 4 số</label>
+              <input id="room-code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}" placeholder="0000" aria-describedby="room-code-help">
+              <small id="room-code-help">Nhập mã mà người tạo phòng gửi cho bạn.</small>
+            </div>
+
+            <div id="menu-message" class="inline-message" role="status" aria-live="polite" hidden></div>
+
+            <footer class="launch-row">
+              <div>
+                <p id="mode-kicker">Training dojo</p>
+                <strong id="mode-description">Tự do kiểm tra đòn, va chạm và dev tools.</strong>
+              </div>
+              <button id="launch-match" class="launch-button" type="button">
+                <span id="launch-label">Vào training</span><span aria-hidden="true">→</span>
+              </button>
+            </footer>
+          </section>
+
+          <aside class="field-notes" aria-label="Ghi chú điều khiển">
+            <div class="notes-title">
+              <span aria-hidden="true">手</span>
+              <div><p>Field notes</p><h2>Phím chiến đấu</h2></div>
+            </div>
+            <dl class="quick-key-list">
+              <div><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Di chuyển có gia tốc</dd></div>
+              <div><dt><kbd>Space</kbd></dt><dd>Nhảy · nhấn lần hai để double jump</dd></div>
+              <div><dt><kbd>J</kbd></dt><dd>Nhấn liên tục hoặc giữ để chạy chuỗi ground/air combo riêng</dd></div>
+              <div><dt><kbd>K</kbd></dt><dd>Giữ để gồng cường hóa special, thả để tung đòn</dd></div>
+              <div><dt><kbd>W</kbd> + hướng</dt><dd>Roll có i-frame · tốc độ và quãng lăn riêng theo lớp nhân vật</dd></div>
+              <div><dt><kbd>L</kbd> + hướng</dt><dd>Chọn hướng teleport; bấm L riêng dùng hướng đang nhìn</dd></div>
+              <div><dt><kbd>S</kbd></dt><dd>Đỡ phía trước; sau lưng vẫn trúng</dd></div>
+              <div><dt><kbd>I</kbd></dt><dd>Đạn tầm xa riêng của từng đấu sĩ · có tốc độ, tầm bay và cooldown khác nhau</dd></div>
+              <div><dt><kbd>O</kbd></dt><dd>Hồi phục nếu bộ asset nhân vật có kỹ năng heal; giới hạn lượt dùng</dd></div>
+              <div><dt><kbd>P</kbd></dt><dd>Tuyệt kỹ phụ dành cho nhân vật còn animation đặc trưng</dd></div>
+              <div><dt><kbd>U</kbd></dt><dd>Ultimate riêng · cần 3 lần đánh trúng để nạp đầy thanh năng lượng</dd></div>
+            </dl>
+            <button id="open-full-guide" class="text-link" type="button">Xem phím online, PvE và phím hệ thống <span aria-hidden="true">↗</span></button>
+            <p class="source-note">Asset được giữ theo đúng folder nhân vật. Không dùng sheet của đấu sĩ này cho đấu sĩ khác.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="game-screen" class="screen game-screen" aria-label="Sân đấu" hidden>
+        <div id="arena-shell" class="arena-shell">
+          <div class="hud" aria-label="Thông tin trận đấu">
+            <div class="health-unit health-unit--p1">
+              <div class="fighter-label"><span>P1</span><strong id="hud-name-p1">Buck Borris</strong></div>
+              <div class="health-track"><div id="health-p1" class="health-fill"></div></div>
+              <div id="ultimate-meter-p1" class="ultimate-meter" role="meter" aria-label="Năng lượng Ultimate P1" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
+                <span class="ultimate-caption">ULT</span>
+                <span class="ultimate-seals" aria-hidden="true"><i></i><i></i><i></i></span>
+                <kbd>U</kbd>
+              </div>
+              <div id="wins-p1" class="round-pips" aria-label="Số ván thắng P1"><i></i><i></i></div>
+            </div>
+
+            <div class="round-clock">
+              <small id="hud-mode">TRAINING</small>
+              <strong id="hud-timer">∞</strong>
+              <span id="hud-round">ROUND 1</span>
+            </div>
+
+            <div class="health-unit health-unit--p2">
+              <div class="fighter-label"><strong id="hud-name-p2">Fantasy Rogue</strong><span>P2</span></div>
+              <div class="health-track"><div id="health-p2" class="health-fill"></div></div>
+              <div id="ultimate-meter-p2" class="ultimate-meter" role="meter" aria-label="Năng lượng Ultimate P2" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
+                <span class="ultimate-caption">ULT</span>
+                <span class="ultimate-seals" aria-hidden="true"><i></i><i></i><i></i></span>
+                <kbd>U</kbd>
+              </div>
+              <div id="wins-p2" class="round-pips" aria-label="Số ván thắng P2"><i></i><i></i></div>
+            </div>
+          </div>
+
+          <div class="arena-utility">
+            <span id="room-badge" class="room-badge">LOCAL</span>
+            <button id="arena-menu-button" class="arena-button" type="button"><span class="keycap">ESC</span> Menu</button>
+          </div>
+
+          <div id="game-container" tabindex="0" aria-label="Canvas game Pixel Clash"></div>
+
+          <div id="ultimate-cinematic" class="ultimate-cinematic" aria-live="assertive" hidden>
+            <div class="ultimate-wash" aria-hidden="true"></div>
+            <i class="ultimate-rail ultimate-rail--top" aria-hidden="true"></i>
+            <i class="ultimate-rail ultimate-rail--bottom" aria-hidden="true"></i>
+            <div class="ultimate-callout">
+              <small id="ultimate-fighter-name">BUCK BORRIS</small>
+              <strong id="ultimate-move-name">THIÊN HỎA DIỆT GIỚI</strong>
+              <span><kbd>U</kbd> ULTIMATE ART</span>
+            </div>
+          </div>
+
+          <div id="phase-banner" class="phase-banner" aria-live="assertive" hidden>
+            <small id="phase-eyebrow">ROUND 1</small>
+            <strong id="phase-title">3</strong>
+            <span id="phase-caption">Chuẩn bị</span>
+          </div>
+
+          <div id="control-ribbon" class="control-ribbon">
+            <span><kbd>A</kbd><kbd>D</kbd> Đi</span>
+            <span><kbd>Space</kbd> Nhảy ×2</span>
+            <span><kbd>J</kbd> Light / Air</span>
+            <span><kbd>K</kbd> Special / Air</span>
+            <span><kbd>W</kbd> + hướng Roll</span>
+            <span><kbd>L</kbd> + hướng Teleport</span>
+            <span><kbd>S</kbd> Block</span>
+            <span><kbd>I</kbd> Ability</span>
+            <span><kbd>O</kbd> Heal</span>
+            <span><kbd>P</kbd> Extra</span>
+            <span><kbd>U</kbd> Ultimate</span>
+            <button id="hide-ribbon" type="button" aria-label="Ẩn gợi ý phím">×</button>
+          </div>
+
+          <div id="debug-readout" class="debug-readout" hidden>
+            <div><span>STATE</span><strong id="debug-state">IDLE</strong></div>
+            <div><span>FRAME</span><strong id="debug-frame">—</strong></div>
+            <div><span>PHASE</span><strong id="debug-phase">—</strong></div>
+            <div><span>PING</span><strong id="debug-ping">—</strong></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+    <aside id="command-drawer" class="command-drawer" aria-hidden="true" aria-labelledby="drawer-title">
+      <header class="drawer-header">
+        <div><p class="eyebrow">Match command</p><h2 id="drawer-title">Tạm dừng</h2></div>
+        <button id="close-drawer" class="close-button" type="button" aria-label="Đóng menu">×</button>
+      </header>
+
+      <nav class="drawer-tabs" aria-label="Danh mục menu">
+        <button type="button" data-drawer-tab="match" class="is-active" aria-selected="true">Trận đấu</button>
+        <button type="button" data-drawer-tab="controls" aria-selected="false">Phím</button>
+        <button type="button" data-drawer-tab="settings" aria-selected="false">Tùy chỉnh</button>
+        <button id="dev-tab-button" type="button" data-drawer-tab="dev" aria-selected="false" hidden>Dev mode</button>
+      </nav>
+
+      <div class="drawer-content">
+        <section class="drawer-panel is-active" data-drawer-panel="match">
+          <div class="match-summary">
+            <span id="drawer-mode-icon">◎</span>
+            <div><small id="drawer-mode">Training</small><strong id="drawer-room">Sân tập</strong></div>
+          </div>
+          <button id="resume-match" class="drawer-primary" type="button">Tiếp tục trận</button>
+          <div class="drawer-action-grid">
+            <button id="drawer-guide" type="button"><span>?</span> Hướng dẫn phím</button>
+            <button id="drawer-fullscreen" type="button"><span>⛶</span> Toàn màn hình</button>
+            <button id="rematch-button" type="button"><span>↻</span> Tái đấu</button>
+            <button id="leave-match" type="button" class="danger-action"><span>↰</span> Thoát về menu</button>
+          </div>
+          <p class="drawer-tip"><kbd>ESC</kbd> đóng/mở menu · trận online vẫn chạy khi mở drawer.</p>
+        </section>
+
+        <section class="drawer-panel" data-drawer-panel="controls">
+          <div class="control-columns">
+            <section>
+              <h3>Người chơi 1</h3>
+              <ul class="binding-list">
+                <li><span>Di chuyển</span><span><kbd>A</kbd><kbd>D</kbd></span></li>
+                <li><span>Nhảy đôi</span><kbd>Space</kbd></li>
+                <li><span>Light / air attack</span><kbd>J</kbd></li>
+                <li><span>Special / air special</span><kbd>K</kbd></li>
+                <li><span>Roll</span><span><kbd>W</kbd> + hướng</span></li>
+                <li><span>Teleport theo hướng</span><span><kbd>L</kbd> + <kbd>A</kbd>/<kbd>D</kbd></span></li>
+                <li><span>Đỡ phía trước</span><kbd>S</kbd></li>
+                <li><span>Kỹ năng riêng / air</span><kbd>I</kbd></li>
+                <li><span>Hồi phục (nếu nhân vật có)</span><kbd>O</kbd></li>
+                <li><span>Tuyệt kỹ phụ (nếu nhân vật có)</span><kbd>P</kbd></li>
+                <li><span>Ultimate · cần 3 hit</span><kbd>U</kbd></li>
+                <li><span>Air cancel</span><span><kbd>J</kbd> → <kbd>K</kbd>/<kbd>I</kbd></span></li>
+              </ul>
+            </section>
+            <section class="mode-control-notes">
+              <h3>Online & PvE</h3>
+              <div class="control-note-card">
+                <span>2 máy</span>
+                <div><strong>Cùng một bộ phím</strong><small>Host và người vào phòng đều dùng A/D, Space, J/K/S/W/L/I/O/P/U trên máy riêng của mình.</small></div>
+              </div>
+              <div class="control-note-card">
+                <span>CPU</span>
+                <div><strong>PvE đấu với máy</strong><small>Bạn dùng bộ phím bên trái. Máy điều khiển P2 theo cấp Dễ, Vừa hoặc Khó.</small></div>
+              </div>
+              <div class="control-note-card">
+                <span>2R</span>
+                <div><strong>Trận cố định 2 round</strong><small>Thắng nhiều round hơn sẽ thắng trận; tỷ số 1–1 được tính là hòa.</small></div>
+              </div>
+            </section>
+          </div>
+          <section class="system-bindings">
+            <h3>Phím hệ thống & phím ẩn</h3>
+            <div><kbd>ESC</kbd><span>Menu trong trận</span></div>
+            <div><kbd>H</kbd><span>Mở thẳng bảng hướng dẫn</span></div>
+            <div><kbd>F3</kbd><span>Bật/tắt hitbox, hurtbox, tọa độ server</span></div>
+            <div><kbd>F</kbd><span>Toàn màn hình</span></div>
+            <div><kbd>R</kbd><span>Reset vị trí trong Training</span></div>
+            <div><kbd>U</kbd><span>Ultimate khi thanh năng lượng đạt 3/3</span></div>
+            <div><kbd>O</kbd><span>Hồi phục giới hạn lần dùng; chỉ nhân vật có asset phù hợp</span></div>
+            <div><kbd>P</kbd><span>Tuyệt kỹ phụ riêng theo bộ asset của từng nhân vật</span></div>
+          </section>
+        </section>
+
+        <section class="drawer-panel" data-drawer-panel="settings">
+          <div class="setting-row">
+            <div><strong>Âm lượng hiệu ứng</strong><small>Âm tổng hợp tạm cho hit và dash</small></div>
+            <input id="sfx-volume" type="range" min="0" max="100" value="55" aria-label="Âm lượng hiệu ứng">
+          </div>
+          <label class="toggle-row"><span><strong>Camera shake</strong><small>Chỉ rung khi special đánh trúng</small></span><input id="camera-shake-toggle" type="checkbox" checked><i></i></label>
+          <label class="toggle-row"><span><strong>Gợi ý phím trên sân</strong><small>Có thể đóng nhanh bằng dấu ×</small></span><input id="ribbon-toggle" type="checkbox" checked><i></i></label>
+          <label class="toggle-row"><span><strong>Giảm chuyển động UI</strong><small>Không ảnh hưởng frame-data trong game</small></span><input id="reduce-motion-toggle" type="checkbox"><i></i></label>
+          <button id="settings-fullscreen" class="drawer-secondary" type="button">Bật / tắt toàn màn hình</button>
+        </section>
+
+        <section class="drawer-panel" data-drawer-panel="dev">
+          <div class="dev-warning"><strong>Training only</strong><span>Các cờ dưới đây do server kiểm soát và không xuất hiện trong đấu thường.</span></div>
+          <label class="toggle-row"><span><strong>P1 bất tử</strong><small>Hit vẫn xác nhận nhưng không vào HURT</small></span><input type="checkbox" data-training-setting="invulnerable"><i></i></label>
+          <label class="toggle-row"><span><strong>Máu P1 vô hạn</strong><small>Vẫn hiện hit-stop và knockback</small></span><input type="checkbox" data-training-setting="infiniteHp"><i></i></label>
+          <label class="toggle-row"><span><strong>Không hồi chiêu</strong><small>Roll, teleport và ability luôn sẵn sàng</small></span><input type="checkbox" data-training-setting="noCooldown"><i></i></label>
+          <label class="toggle-row"><span><strong>Đóng băng dummy</strong><small>Dummy không tự di chuyển</small></span><input type="checkbox" data-training-setting="freezeDummy"><i></i></label>
+          <label class="toggle-row"><span><strong>Dummy đỡ phía trước</strong><small>Quay mặt theo P1 và giữ block</small></span><input type="checkbox" data-training-setting="dummyGuard"><i></i></label>
+          <label class="toggle-row"><span><strong>Đóng băng mô phỏng</strong><small>Dùng nút Frame +1 để xem từng khung logic</small></span><input type="checkbox" data-training-setting="paused"><i></i></label>
+          <div class="dev-actions">
+            <button id="training-frame-step" type="button">Frame +1</button>
+            <button id="training-reset" type="button">Reset training</button>
+            <button id="training-hitboxes" type="button">Hitbox / F3</button>
+            <button id="training-vfx-showcase" type="button">Trình diễn VFX</button>
+            <button id="training-ultimate-fill" type="button">Nạp đầy Ultimate</button>
+            <button id="training-ultimate-use" type="button">Dùng Ultimate ngay</button>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="loading-cover" class="loading-cover" hidden>
+      <div class="loading-emblem" aria-hidden="true"><i></i><i></i><i></i></div>
+      <strong>Đang chuẩn bị sân đấu</strong>
+      <span id="loading-message">Đồng bộ với server…</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script src="/intro.js?v=3.1.6"></script>
+  <script src="/shared/game-data.js?v=3.1.6"></script>
+  <script src="/game.js?v=3.1.6"></script>
+</body>
+</html>
