@@ -17,7 +17,8 @@ const CHARGED_SPECIAL_HEIGHT_MULTIPLIER = 1.35;
 const INPUT_KEYS = Object.freeze(['left', 'right', 'jump', 'light', 'special', 'roll', 'teleport', 'block', 'ability', 'support', 'extra', 'ultimate']);
 const BUFFERED_KEYS = Object.freeze(['jump', 'light', 'special', 'roll', 'teleport', 'ability', 'support', 'extra', 'ultimate']);
 const VALID_MODES = new Set(['training', 'pve', 'online']);
-const MAX_ROUNDS = 2;
+const MAX_ROUNDS = 3;
+const WINS_NEEDED = 2;
 const AI_DIFFICULTIES = Object.freeze({
   easy: Object.freeze({
     reactionFrames: 28, jitterFrames: 8, aggression: 0.42, guardChance: 0.22,
@@ -1140,7 +1141,8 @@ function finishRound(room, winnerSlot = null) {
   if (room.mode === 'training') return;
   if (Number.isInteger(winnerSlot)) room.fighters[winnerSlot].wins += 1;
   room.roundWinner = Number.isInteger(winnerSlot) ? winnerSlot : null;
-  const finalRound = room.round >= MAX_ROUNDS;
+  const someoneWon = room.fighters.some((f) => f.wins >= WINS_NEEDED);
+  const finalRound = room.round >= MAX_ROUNDS || someoneWon;
   room.phase = finalRound ? 'match-over' : 'round-over';
   room.matchWinner = finalRound ? leadingFighterSlot(room) : null;
   room.roundEndFrames = 180;

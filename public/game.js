@@ -669,7 +669,7 @@
     },
     pve: {
       kicker: 'PvE mission',
-      description: 'Đấu với CPU authoritative qua đúng 2 round, có ba cấp phản ứng từ Dễ đến Khó.',
+      description: 'Đấu với CPU authoritative theo thể thức Best of 3 (ai thắng 2 round trước sẽ chiến thắng), có ba cấp phản ứng từ Dễ đến Khó.',
       launch: 'Bắt đầu đấu máy'
     },
     'online-create': {
@@ -706,6 +706,7 @@
     scene: null,
     cssFullscreen: false,
     phaseHideTimer: 0,
+    matchOverTimer: 0,
     lastUltimateEnergy: [0, 0]
   };
 
@@ -1038,6 +1039,7 @@
   }
 
   function leaveSession() {
+    window.clearTimeout(session.matchOverTimer);
     socket.emit('room:leave');
     closeDrawer();
     session.active = false;
@@ -1274,7 +1276,18 @@
       showPhase(`ROUND ${state.round}`, 'KẾT THÚC', winner ? `${CHARACTERS[winner.character].name} thắng ván` : 'Hòa');
     } else if (state.phase === 'match-over') {
       const winner = Number.isInteger(state.matchWinner) ? state.fighters[state.matchWinner] : null;
-      showPhase('2 ROUNDS', winner ? 'THẮNG' : 'HÒA', winner ? CHARACTERS[winner.character].name : 'Tỷ số 1–1');
+      const winsA = state.fighters[0]?.wins || 0;
+      const winsB = state.fighters[1]?.wins || 0;
+      showPhase('BEST OF 3', winner ? 'THẮNG' : 'HÒA', winner ? `${CHARACTERS[winner.character].name} (${winsA}–${winsB})` : `Tỷ số ${winsA}–${winsB}`);
+      // Auto-return to main menu after 5 seconds
+      window.clearTimeout(session.matchOverTimer);
+      session.matchOverTimer = window.setTimeout(() => {
+        if (session.active) leaveSession();
+      }, 5000);
+    }
+    // Clear auto-return timer if phase changed away from match-over (e.g. rematch)
+    if (state.phase !== 'match-over') {
+      window.clearTimeout(session.matchOverTimer);
     }
     session.lastPhase = state.phase;
     session.lastIntro = state.intro;
