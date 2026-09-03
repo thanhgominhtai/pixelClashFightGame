@@ -64,7 +64,6 @@ app.use('/assets', express.static(path.join(__dirname, 'Character_platformer')))
 app.use('/backgrounds', express.static(path.join(__dirname, 'backgound_map')));
 app.use('/common-vfx', express.static(path.join(__dirname, 'vfx')));
 app.use('/sounds', express.static(path.join(__dirname, '400 Sounds Pack')));
-app.use('/intro', express.static(path.join(__dirname, 'introGame')));
 
 const rooms = new Map();
 
