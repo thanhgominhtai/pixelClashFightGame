@@ -274,7 +274,7 @@ kbd {
   overflow: hidden;
   padding: clamp(.5rem, 1.5vh, 1rem) clamp(.65rem, 2vw, 1.6rem);
   background-color: var(--sky);
-  background-image: url("/backgrounds/BG_DesertMountains/background1.png");
+  background-image: url("./backgrounds/BG_DesertMountains/background1.png");
   background-repeat: repeat-x;
   background-position: center 18%;
   background-size: auto 130%;
@@ -303,7 +303,7 @@ kbd {
   left: 4%;
   width: 181px;
   height: 66px;
-  background-image: url("/backgrounds/BG_DesertMountains/cloud7.png");
+  background-image: url("./backgrounds/BG_DesertMountains/cloud7.png");
 }
 
 .menu-cloud--two {
@@ -311,7 +311,7 @@ kbd {
   bottom: 12%;
   width: 147px;
   height: 54px;
-  background-image: url("/backgrounds/BG_DesertMountains/cloud2.png");
+  background-image: url("./backgrounds/BG_DesertMountains/cloud2.png");
   animation-delay: -7s;
 }
 

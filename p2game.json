@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "id": "pixel-clash-dojo",
+  "name": "Pixel Clash Dojo",
+  "version": "3.1.6",
+  "description": "Game đối kháng pixel 2D 1v1 trên trình duyệt. Chọn đấu sĩ, thi triển combo, tung tuyệt kỹ Ultimate và so tài trực tiếp qua mạng hoặc luyện tập.",
+  "shortDescription": "Đấu trường đối kháng pixel 2D 1v1 tốc độ cao trên trình duyệt.",
+  "entry": "index.html",
+  "engine": "webgl",
+  "orientation": "landscape",
+  "minViewport": {
+    "width": 960,
+    "height": 540
+  },
+  "category": "action",
+  "tags": [
+    "fighting",
+    "pixel-art",
+    "multiplayer",
+    "pvp",
+    "2d"
+  ],
+  "ageRating": "T",
+  "languages": [
+    "vi",
+    "en"
+  ],
+  "controls": {
+    "keyboard": "A/D để di chuyển, Space để nhảy, J/K tấn công, S đỡ đòn, U dùng Ultimate, F toàn màn hình"
+  },
+  "assets": {
+    "icon": "assets/store/icon-512.png",
+    "cover": "assets/store/cover-1280x720.png",
+    "screenshots": [
+      "assets/store/screenshot-1.png"
+    ]
+  },
+  "permissions": [
+    "fullscreen",
+    "audio",
+    "external-network"
+  ],
+  "networkAllowlist": [
+    "pixelclashfightgame.onrender.com"
+  ],
+  "sdk": {
+    "version": "1.0",
+    "requiresAuth": false,
+    "cloudSave": false
+  },
+  "attestation": {
+    "ownsRights": true,
+    "noThirdPartyTracking": true,
+    "containsAds": false,
+    "containsIap": false
+  }
+}

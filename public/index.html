@@ -8,11 +8,11 @@
   <meta property="og:title" content="Pixel Clash Dojo">
   <meta property="og:description" content="Chọn đấu sĩ, vào training hoặc đấu 1v1 trên trình duyệt.">
   <title>Pixel Clash Dojo</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito+Sans:opsz,wght@6..12,500;6..12,600;6..12,700;6..12,800&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=3.1.6">
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Bỏ qua đến nội dung chính</a>
@@ -152,31 +152,31 @@
               </header>
               <div class="map-card-rail" role="radiogroup" aria-label="Danh sách chiến địa">
                 <button class="map-card is-selected" type="button" data-map="desert" role="radio" aria-checked="true">
-                  <img src="/backgrounds/BG_DesertMountains/background1.png" alt="" loading="eager">
+                  <img src="./backgrounds/BG_DesertMountains/background1.png" alt="" loading="eager">
                   <span class="map-card-shade"></span><span class="map-card-copy"><strong>Sa mạc Thiên Sơn</strong><small>Phẳng · cơ bản</small></span>
                 </button>
                 <button class="map-card" type="button" data-map="ancientForest" role="radio" aria-checked="false">
-                  <img src="/backgrounds/Free Pixel Art Forest/Free Pixel Art Forest/Preview/Background.png" alt="" loading="eager">
+                  <img src="./backgrounds/Free Pixel Art Forest/Free Pixel Art Forest/Preview/Background.png" alt="" loading="eager">
                   <span class="map-card-shade"></span><span class="map-card-copy"><strong>Rừng Cổ Thụ</strong><small>5 bệ cỏ</small></span>
                 </button>
                 <button class="map-card" type="button" data-map="glacial" role="radio" aria-checked="false">
-                  <img src="/backgrounds/Glacial-mountains-parallax-background_vnitti_v3/Glacial-mountains-parallax-background_vnitti/background_glacial_mountains_lightened.png" alt="" loading="eager">
+                  <img src="./backgrounds/Glacial-mountains-parallax-background_vnitti_v3/Glacial-mountains-parallax-background_vnitti/background_glacial_mountains_lightened.png" alt="" loading="eager">
                   <span class="map-card-shade"></span><span class="map-card-copy"><strong>Đỉnh Băng Lam</strong><small>Cầu băng</small></span>
                 </button>
                 <button class="map-card" type="button" data-map="pinePeak" role="radio" aria-checked="false">
-                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_3/origbig.png" alt="" loading="eager">
+                  <img src="./backgrounds/Nature Landscapes Free Pixel Art/nature_3/origbig.png" alt="" loading="eager">
                   <span class="map-card-shade"></span><span class="map-card-copy"><strong>Chân Núi Tùng</strong><small>Hai tháp đấu</small></span>
                 </button>
                 <button class="map-card" type="button" data-map="meadow" role="radio" aria-checked="false">
-                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_2/origbig.png" alt="" loading="eager">
+                  <img src="./backgrounds/Nature Landscapes Free Pixel Art/nature_2/origbig.png" alt="" loading="eager">
                   <span class="map-card-shade"></span><span class="map-card-copy"><strong>Đồng Cỏ Gió</strong><small>3 đảo cỏ</small></span>
                 </button>
                 <button class="map-card" type="button" data-map="aurora" role="radio" aria-checked="false">
-                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_6/origbig.png" alt="" loading="eager">
+                  <img src="./backgrounds/Nature Landscapes Free Pixel Art/nature_6/origbig.png" alt="" loading="eager">
                   <span class="map-card-shade"></span><span class="map-card-copy"><strong>Cực Quang Dạ</strong><small>Tháp 5 tầng</small></span>
                 </button>
                 <button class="map-card" type="button" data-map="coast" role="radio" aria-checked="false">
-                  <img src="/backgrounds/Nature Landscapes Free Pixel Art/nature_8/origbig.png" alt="" loading="eager">
+                  <img src="./backgrounds/Nature Landscapes Free Pixel Art/nature_8/origbig.png" alt="" loading="eager">
                   <span class="map-card-shade"></span><span class="map-card-copy"><strong>Vịnh Đá Trắng</strong><small>Cầu đá so le</small></span>
                 </button>
               </div>
@@ -263,7 +263,9 @@
             <button id="arena-menu-button" class="arena-button" type="button"><span class="keycap">ESC</span> Menu</button>
           </div>
 
-          <div id="game-container" tabindex="0" aria-label="Canvas game Pixel Clash"></div>
+          <div id="game-container" tabindex="0" aria-label="Canvas game Pixel Clash">
+            <canvas id="game-canvas" width="960" height="540"></canvas>
+          </div>
 
           <div id="ultimate-cinematic" class="ultimate-cinematic" aria-live="assertive" hidden>
             <div class="ultimate-wash" aria-hidden="true"></div>
@@ -424,8 +426,10 @@
     </div>
   </div>
 
+  <script src="./sdk/p2game-sdk.v1.js"></script>
+  <script src="./shared/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-  <script src="/shared/game-data.js?v=3.1.6"></script>
-  <script src="/game.js?v=3.1.6"></script>
+  <script src="./shared/game-data.js"></script>
+  <script src="./game.js"></script>
 </body>
 </html>

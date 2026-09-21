@@ -1,18 +1,30 @@
 'use strict';
 
+// 1. Handshake with p2game SDK as early as possible (RT-006)
+if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'function') {
+  window.p2.init().then((ctx) => {
+    if (ctx?.player && typeof session !== 'undefined') session.p2User = ctx.player;
+    if (window.p2.auth && typeof window.p2.auth.getUser === 'function') {
+      window.p2.auth.getUser().then((u) => {
+        if (u && typeof session !== 'undefined') session.p2User = u;
+      }).catch(() => {});
+    }
+  }).catch((e) => console.warn('[p2game] init error:', e));
+}
+
 (function bootPixelClash() {
   const query = new URLSearchParams(window.location.search);
-  const socketEndpoint = query.get('socket') || window.PIXEL_SOCKET_URL || undefined;
+  const isLocalDevServer = typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+    (window.location.port === '3000' || window.location.port === '3001');
+  const defaultRemote = 'https://pixelclashfightgame.onrender.com';
+  const socketEndpoint = query.get('socket') || window.PIXEL_SOCKET_URL || (isLocalDevServer ? undefined : defaultRemote);
+
   if (!window.io) {
     if (window.__pixelClashSocketLoading) return;
     window.__pixelClashSocketLoading = true;
     const script = document.createElement('script');
-    try {
-      const base = socketEndpoint ? new URL(socketEndpoint, window.location.href) : new URL(window.location.origin);
-      script.src = new URL('/socket.io/socket.io.js', base).href;
-    } catch (_error) {
-      script.src = '/socket.io/socket.io.js';
-    }
+    script.src = './shared/socket.io.min.js';
     script.onload = () => {
       window.__pixelClashSocketLoading = false;
       bootPixelClash();
@@ -21,7 +33,7 @@
       const message = document.getElementById('menu-message');
       if (message) {
         message.hidden = false;
-        message.textContent = 'Không tải được Socket.io client từ backend. Kiểm tra URL ?socket= và trạng thái server.';
+        message.textContent = 'Không tải được Socket.io client. Vui lòng kiểm tra kết nối mạng.';
       }
     };
     document.head.append(script);
@@ -33,9 +45,26 @@
 
   const { WORLD, NETWORK, MAPS, CHARACTERS } = GAME;
   const socket = window.io(socketEndpoint, {
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
+    autoConnect: false,
+    reconnection: true,
+    reconnectionAttempts: 5,
     auth: { clientVersion: GAME.version }
   });
+
+  function ensureSocketConnected() {
+    if (!socket.connected && !socket.active) {
+      socket.connect();
+    }
+  }
+
+  if (isLocalDevServer) {
+    socket.connect();
+  } else {
+    ['pointerdown', 'keydown', 'touchstart'].forEach((type) => {
+      window.addEventListener(type, ensureSocketConnected, { once: true });
+    });
+  }
 
   // Optional VFX kitbash registry. Keep every URL inside the owning character
   // folder; preload rejects cross-character paths. Example:
@@ -707,7 +736,8 @@
     cssFullscreen: false,
     phaseHideTimer: 0,
     matchOverTimer: 0,
-    lastUltimateEnergy: [0, 0]
+    lastUltimateEnergy: [0, 0],
+    p2User: null
   };
 
   const preferences = {
@@ -937,9 +967,19 @@
   });
 
   async function launchSelectedMode() {
+    ensureSocketConnected();
     if (!socket.connected) {
-      setMenuError('Chưa kết nối được server. Kiểm tra lại Node.js và cổng đang chạy.');
-      return;
+      setLoading(true, 'Đang kết nối tới server…');
+      let waitMs = 0;
+      while (!socket.connected && waitMs < 3000) {
+        await new Promise((r) => setTimeout(r, 150));
+        waitMs += 150;
+      }
+      setLoading(false);
+      if (!socket.connected) {
+        setMenuError('Chưa kết nối được server chiến đấu. Hãy thử lại sau vài giây.');
+        return;
+      }
     }
     if (!window.Phaser) {
       setMenuError('Không tải được Phaser 3 từ CDN. Hãy kiểm tra kết nối mạng.');
@@ -1164,6 +1204,10 @@
 
   async function toggleFullscreen() {
     try {
+      if (typeof window !== 'undefined' && window.p2?.ui && typeof window.p2.ui.requestFullscreen === 'function') {
+        await window.p2.ui.requestFullscreen();
+        return;
+      }
       if (document.fullscreenElement) {
         await document.exitFullscreen();
         return;
@@ -1214,7 +1258,9 @@
     if (!state?.fighters) return;
     state.fighters.forEach((fighter, slot) => {
       const definition = CHARACTERS[fighter.character];
-      ui.names[slot].textContent = definition.name;
+      ui.names[slot].textContent = (slot === 0 && session.p2User?.displayName)
+        ? `${definition.name} · ${session.p2User.displayName}`
+        : definition.name;
       const ratio = Math.max(0, Math.min(1, fighter.hp / fighter.maxHp));
       ui.health[slot].style.transform = `scaleX(${ratio})`;
       ui.health[slot].style.backgroundColor = ratio <= .25 ? '#ad443d' : slot === 0 ? '#d66043' : '#66558f';
@@ -1279,6 +1325,16 @@
       const winsA = state.fighters[0]?.wins || 0;
       const winsB = state.fighters[1]?.wins || 0;
       showPhase('BEST OF 3', winner ? 'THẮNG' : 'HÒA', winner ? `${CHARACTERS[winner.character].name} (${winsA}–${winsB})` : `Tỷ số ${winsA}–${winsB}`);
+      if (typeof window !== 'undefined' && window.p2 && typeof window.p2.gameOver === 'function') {
+        try {
+          window.p2.gameOver({
+            winner: winner ? winner.character : 'draw',
+            score: state.matchWinner === 0 ? (winsA * 1000 + 500) : (winsA * 500),
+            winsA,
+            winsB
+          });
+        } catch (_) {}
+      }
       // Auto-return to main menu after 5 seconds
       window.clearTimeout(session.matchOverTimer);
       session.matchOverTimer = window.setTimeout(() => {
@@ -1354,7 +1410,7 @@
       const stage = MAPS[session.mapId] || MAPS.desert;
       if (stage.background.kind === 'layers') {
         stage.background.layers.forEach((url, index) => this.load.image(`stage-layer-${index}`, url));
-        ['cloud1', 'cloud2', 'cloud4', 'cloud7'].forEach((name) => this.load.image(`stage-${name}`, `/backgrounds/BG_DesertMountains/${name}.png`));
+        ['cloud1', 'cloud2', 'cloud4', 'cloud7'].forEach((name) => this.load.image(`stage-${name}`, `./backgrounds/BG_DesertMountains/${name}.png`));
       } else {
         this.load.image('stage-image', stage.background.file);
       }
@@ -1410,10 +1466,10 @@
       });
 
       Object.entries(VFX_KIT).forEach(([character, moves]) => {
-        const requiredRoot = character === 'buck' ? '/assets/Buck Borris/' : '/assets/Fantasy Rogue/';
+        const requiredRoot = character === 'buck' ? 'assets/Buck Borris/' : 'assets/Fantasy Rogue/';
         Object.entries(moves).forEach(([move, spec]) => {
           if (!spec) return;
-          if (!spec.url.startsWith(requiredRoot)) {
+          if (!spec.url.includes(requiredRoot)) {
             console.error(`[VFX ownership] ${character}.${move} phải nằm trong ${requiredRoot}`);
             return;
           }
@@ -3088,9 +3144,18 @@
 
   function createGame() {
     if (session.game) return;
+    const existingCanvas = document.getElementById('game-canvas');
+    const isWebGLSupported = () => {
+      try {
+        const c = document.createElement('canvas');
+        return Boolean(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch (_) { return false; }
+    };
+    const renderType = isWebGLSupported() ? Phaser.WEBGL : Phaser.CANVAS;
     session.game = new Phaser.Game({
-      type: Phaser.AUTO,
+      type: renderType,
       parent: 'game-container',
+      canvas: existingCanvas || undefined,
       width: WORLD.viewWidth,
       height: WORLD.viewHeight,
       // Matches the top pixel of background1, so zooming out reveals a
@@ -3114,4 +3179,29 @@
   window.addEventListener('resize', () => session.game?.scale.refresh());
   applyPreferences();
   selectMenuMode('training');
+
+  // p2game SDK Handshake & Lifecycle
+  if (typeof window !== 'undefined' && window.p2) {
+    if (typeof window.p2.init === 'function') {
+      window.p2.init().then((ctx) => {
+        if (ctx && ctx.player) session.p2User = ctx.player;
+        if (window.p2.auth && typeof window.p2.auth.getUser === 'function') {
+          window.p2.auth.getUser().then((u) => { if (u) session.p2User = u; }).catch(() => {});
+        }
+      }).catch((e) => console.warn('P2 SDK init notice:', e));
+    }
+    if (typeof window.p2.ready === 'function') {
+      try { window.p2.ready(); } catch (_) {}
+    }
+    if (typeof window.p2.onPause === 'function') {
+      window.p2.onPause(() => {
+        if (session.game) session.game.scene.pause('default');
+      });
+    }
+    if (typeof window.p2.onResume === 'function') {
+      window.p2.onResume(() => {
+        if (session.game) session.game.scene.resume('default');
+      });
+    }
+  }
 })();

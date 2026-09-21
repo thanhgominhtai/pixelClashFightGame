@@ -10,7 +10,10 @@
     "check": "node --check server.js && node --check public/shared/game-data.js && node --check public/game.js && node --check scripts/smoke_combat.js && node scripts/validate_roster.js",
     "test:combat": "node scripts/smoke_combat.js",
     "build:characters": "python scripts/build_character_sheets.py",
-    "validate:roster": "node scripts/validate_roster.js"
+    "validate:roster": "node scripts/validate_roster.js",
+    "assets:store": "powershell -File scripts/generate_store_assets.ps1",
+    "build:p2game": "node scripts/build_p2game.js",
+    "validate:p2game": "node scripts/validate_p2game.js"
   },
   "engines": {
     "node": ">=18"
