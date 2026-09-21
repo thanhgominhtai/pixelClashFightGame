@@ -209,9 +209,14 @@ const slug = manifestData.id || 'pixel-clash-dojo';
 console.log(`\n6. Creating upload-ready ZIP archive: dist/${slug}.zip...`);
 const zipOutPath = path.join(ROOT_DIR, 'dist', `${slug}.zip`);
 try {
-  // Use PowerShell Compress-Archive for native, fast Windows zip creation without extra npm dependencies
-  const psZipCmd = `powershell -Command "Get-ChildItem -Path '${DIST_DIR}' -Exclude '*.zip' | Compress-Archive -DestinationPath '${zipOutPath}' -Force"`;
-  execSync(psZipCmd, { stdio: 'inherit' });
+  // Use Windows built-in bsdtar to create POSIX-compliant ZIP with forward slashes (Rule AR-005)
+  try {
+    if (fs.existsSync(zipOutPath)) fs.unlinkSync(zipOutPath);
+    execSync(`tar -a -c -f "${slug}.zip" *`, { cwd: DIST_DIR, stdio: 'inherit' });
+  } catch (_) {
+    const psZipCmd = `powershell -Command "Get-ChildItem -Path '${DIST_DIR}' -Exclude '*.zip' | Compress-Archive -DestinationPath '${zipOutPath}' -Force"`;
+    execSync(psZipCmd, { stdio: 'inherit' });
+  }
   const zipSizeMB = (fs.statSync(zipOutPath).size / (1024 * 1024)).toFixed(2);
   console.log(`- ZIP Archive Created: ${zipOutPath}`);
   console.log(`- ZIP Archive Size   : ${zipSizeMB} MB (Limit: 200 MB)`);
