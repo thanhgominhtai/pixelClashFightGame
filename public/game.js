@@ -1024,8 +1024,15 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
 
   ui.launch.addEventListener('click', launchSelectedMode);
 
+  function isVersionCompatible(v1, v2) {
+    if (!v1 || !v2 || v1 === v2) return true;
+    const [maj1, min1] = String(v1).split('.');
+    const [maj2, min2] = String(v2).split('.');
+    return maj1 === maj2 && min1 === min2;
+  }
+
   function ensureCompatibleVersion(state) {
-    if (!state?.version || state.version === GAME.version) return true;
+    if (!state?.version || isVersionCompatible(state.version, GAME.version)) return true;
     const reloadKey = `pixel-clash-reload-${state.version}`;
     setLoading(true, `Đang đồng bộ client ${GAME.version} với server ${state.version}…`);
     if (!sessionStorage.getItem(reloadKey)) {

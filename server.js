@@ -1494,9 +1494,16 @@ function responseError(callback, message) {
   if (typeof callback === 'function') callback({ ok: false, message });
 }
 
+function isVersionCompatible(v1, v2) {
+  if (!v1 || !v2 || v1 === v2) return true;
+  const [maj1, min1] = String(v1).split('.');
+  const [maj2, min2] = String(v2).split('.');
+  return maj1 === maj2 && min1 === min2;
+}
+
 function requireCurrentClient(payload, callback) {
   const clientVersion = String(payload?.clientVersion || '').trim();
-  if (clientVersion === GAME.version) return true;
+  if (isVersionCompatible(clientVersion, GAME.version)) return true;
   responseError(
     callback,
     `Client ${clientVersion || 'cũ'} không khớp server ${GAME.version}. Hãy nhấn Ctrl+F5 để tải bản mới.`
