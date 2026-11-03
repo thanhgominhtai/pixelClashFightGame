@@ -208,19 +208,33 @@ const manifestData = JSON.parse(fs.readFileSync(path.join(DIST_DIR, 'p2game.json
 const slug = manifestData.id || 'pixel-clash-dojo';
 console.log(`\n6. Creating upload-ready ZIP archive: dist/${slug}.zip...`);
 const zipOutPath = path.join(ROOT_DIR, 'dist', `${slug}.zip`);
+const rootZipPath = path.join(ROOT_DIR, `${slug}.zip`);
+
+// Clean any pre-existing zip in dist/ or root so tar never bundles it
+[zipOutPath, rootZipPath].forEach((p) => {
+  if (fs.existsSync(p)) {
+    try { fs.unlinkSync(p); } catch (_) {}
+  }
+});
+
 try {
   // Use Windows built-in bsdtar to create POSIX-compliant ZIP with forward slashes (Rule AR-005)
+  // Archive to root first with --exclude="*.zip" to guarantee clean contents
   try {
-    if (fs.existsSync(zipOutPath)) fs.unlinkSync(zipOutPath);
-    execSync(`tar -a -c -f "${slug}.zip" *`, { cwd: DIST_DIR, stdio: 'inherit' });
+    execSync(`tar -a -c -f "${rootZipPath}" --exclude="*.zip" *`, { cwd: DIST_DIR, stdio: 'inherit' });
   } catch (_) {
-    const psZipCmd = `powershell -Command "Get-ChildItem -Path '${DIST_DIR}' -Exclude '*.zip' | Compress-Archive -DestinationPath '${zipOutPath}' -Force"`;
+    const psZipCmd = `powershell -Command "Get-ChildItem -Path '${DIST_DIR}' -Exclude '*.zip' | Compress-Archive -DestinationPath '${rootZipPath}' -Force"`;
     execSync(psZipCmd, { stdio: 'inherit' });
   }
-  const zipSizeMB = (fs.statSync(zipOutPath).size / (1024 * 1024)).toFixed(2);
-  console.log(`- ZIP Archive Created: ${zipOutPath}`);
+
+  // Copy to dist/ folder as well for convenience
+  fs.copyFileSync(rootZipPath, zipOutPath);
+
+  const zipSizeMB = (fs.statSync(rootZipPath).size / (1024 * 1024)).toFixed(2);
+  console.log(`- ZIP Archive Created: ${rootZipPath}`);
+  console.log(`- Also copied to     : ${zipOutPath}`);
   console.log(`- ZIP Archive Size   : ${zipSizeMB} MB (Limit: 200 MB)`);
-  if (fs.statSync(zipOutPath).size > 200 * 1024 * 1024) {
+  if (fs.statSync(rootZipPath).size > 200 * 1024 * 1024) {
     console.error(`ERROR: ZIP size exceeds 200 MB limit (${zipSizeMB} MB)!`);
     process.exit(1);
   }
