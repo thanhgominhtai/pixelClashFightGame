@@ -189,7 +189,9 @@ function createRoom(mode, ownerId, characters, options = {}) {
     aiDifficulty,
     mapId: sanitizeMapId(options.mapId),
     ai: { nextDecisionTick: 0, input: blankInput() },
-    lastActivityAt: Date.now()
+    lastActivityAt: Date.now(),
+    readyPlayers: new Set(),
+    loadingTimeout: null
   };
   if (room.phase === 'intro') room.fighters.forEach((fighter) => setState(fighter, 'APPEAR'));
   rooms.set(code, room);
@@ -1285,7 +1287,7 @@ function expireStaleInput(room) {
 function stepRoom(room) {
   room.tick += 1;
 
-  if (room.phase === 'waiting') {
+  if (room.phase === 'waiting' || room.phase === 'loading') {
     if (room.tick % SNAPSHOT_EVERY === 0) emitSnapshot(room);
     return;
   }
@@ -1462,9 +1464,18 @@ function leaveCurrentRoom(socket, notify = true) {
   room.seats = room.seats.map((id) => (id === socket.id ? null : id));
   const remaining = [...new Set(room.seats.filter(Boolean))];
   if (remaining.length === 0 || room.mode !== 'online') {
+    if (room.loadingTimeout) {
+      clearTimeout(room.loadingTimeout);
+      room.loadingTimeout = null;
+    }
     rooms.delete(code);
     return;
   }
+  if (room.loadingTimeout) {
+    clearTimeout(room.loadingTimeout);
+    room.loadingTimeout = null;
+  }
+  room.readyPlayers = new Set();
   room.phase = 'waiting';
   room.projectiles = [];
   room.ultimate = null;
@@ -1532,8 +1543,45 @@ io.on('connection', (socket) => {
     room.roundWinner = null;
     room.matchWinner = null;
     room.fighters.forEach((fighter) => { fighter.wins = 0; });
+    room.readyPlayers = new Set();
+    room.phase = 'loading';
+    if (room.loadingTimeout) {
+      clearTimeout(room.loadingTimeout);
+      room.loadingTimeout = null;
+    }
+    // Safety fallback: If one client hangs on loading, start match automatically after 12s
+    room.loadingTimeout = setTimeout(() => {
+      if (room.phase === 'loading') {
+        room.loadingTimeout = null;
+        startRound(room);
+      }
+    }, 12000);
+
     callback?.({ ok: true, code, mode: 'online', seat: 1, controlledSlots: [1], state: roomSnapshot(room) });
-    startRound(room);
+    emitRoom(room, 'match:phase', { phase: 'loading', round: room.round });
+    emitSnapshot(room);
+  });
+
+  socket.on('player:ready', () => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.phase !== 'loading') return;
+    const slot = room.seats[0] === socket.id ? 0 : room.seats[1] === socket.id ? 1 : -1;
+    if (slot !== 0 && slot !== 1) return;
+    if (!room.readyPlayers) room.readyPlayers = new Set();
+    room.readyPlayers.add(slot);
+
+    // Online mode requires both players (slot 0 and 1) to be ready before countdown begins
+    const allReady = room.mode === 'online'
+      ? (room.readyPlayers.has(0) && room.readyPlayers.has(1))
+      : room.readyPlayers.has(0);
+
+    if (allReady) {
+      if (room.loadingTimeout) {
+        clearTimeout(room.loadingTimeout);
+        room.loadingTimeout = null;
+      }
+      startRound(room);
+    }
   });
 
   socket.on('player:input', (payload) => {

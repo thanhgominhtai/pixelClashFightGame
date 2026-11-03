@@ -46,9 +46,10 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
   const { WORLD, NETWORK, MAPS, CHARACTERS } = GAME;
   const socket = window.io(socketEndpoint, {
     transports: ['polling', 'websocket'],
-    autoConnect: false,
+    autoConnect: true,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 20,
+    reconnectionDelay: 1000,
     auth: { clientVersion: GAME.version }
   });
 
@@ -58,13 +59,8 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
     }
   }
 
-  if (isLocalDevServer) {
-    socket.connect();
-  } else {
-    ['pointerdown', 'keydown', 'touchstart'].forEach((type) => {
-      window.addEventListener(type, ensureSocketConnected, { once: true });
-    });
-  }
+  // Kết nối socket sớm ngay khi nạp trang để đánh thức server Render kịp thời (khắc phục Cold Start)
+  ensureSocketConnected();
 
   // Optional VFX kitbash registry. Keep every URL inside the owning character
   // folder; preload rejects cross-character paths. Example:
@@ -736,6 +732,7 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
     cssFullscreen: false,
     phaseHideTimer: 0,
     matchOverTimer: 0,
+    reportedReady: false,
     lastUltimateEnergy: [0, 0],
     p2User: null
   };
@@ -969,17 +966,21 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
   async function launchSelectedMode() {
     ensureSocketConnected();
     if (!socket.connected) {
-      setLoading(true, 'Đang kết nối tới server…');
+      setLoading(true, 'Máy chủ Render đang thức dậy (Cold Start ~20-30s), vui lòng đợi…');
       let waitMs = 0;
-      while (!socket.connected && waitMs < 3000) {
-        await new Promise((r) => setTimeout(r, 150));
-        waitMs += 150;
+      while (!socket.connected && waitMs < 35000) {
+        await new Promise((r) => setTimeout(r, 300));
+        waitMs += 300;
+        if (waitMs % 3000 === 0) {
+          setLoading(true, `Máy chủ đang thức dậy... (${Math.round(waitMs / 1000)}s)`);
+        }
       }
-      setLoading(false);
       if (!socket.connected) {
-        setMenuError('Chưa kết nối được server chiến đấu. Hãy thử lại sau vài giây.');
+        setLoading(false);
+        setMenuError('Máy chủ phản hồi chậm. Vui lòng bấm thử lại sau ít giây.');
         return;
       }
+      setLoading(false);
     }
     if (!window.Phaser) {
       setMenuError('Không tải được Phaser 3 từ CDN. Hãy kiểm tra kết nối mạng.');
@@ -1050,6 +1051,7 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
     selectMap(session.mapId, false, true);
     session.lastPhase = null;
     session.lastIntro = null;
+    session.reportedReady = false;
     session.debug = false;
     session.inputSequence = 0;
     session.lastInputSent = [{}, {}];
@@ -1087,6 +1089,7 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
     session.code = null;
     session.latestState = null;
     session.controlledSlots = [];
+    session.reportedReady = false;
     session.lastUltimateEnergy = [0, 0];
     if (session.game) {
       session.game.destroy(true);
