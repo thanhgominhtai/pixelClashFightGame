@@ -13,54 +13,10 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
 }
 
 (function bootPixelClash() {
-  const query = new URLSearchParams(window.location.search);
-  const isLocalDevServer = typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
-    (window.location.port === '3000' || window.location.port === '3001');
-  const defaultRemote = 'https://pixelclashfightgame.onrender.com';
-  const socketEndpoint = query.get('socket') || window.PIXEL_SOCKET_URL || (isLocalDevServer ? undefined : defaultRemote);
-
-  if (!window.io) {
-    if (window.__pixelClashSocketLoading) return;
-    window.__pixelClashSocketLoading = true;
-    const script = document.createElement('script');
-    script.src = './shared/socket.io.min.js';
-    script.onload = () => {
-      window.__pixelClashSocketLoading = false;
-      bootPixelClash();
-    };
-    script.onerror = () => {
-      const message = document.getElementById('menu-message');
-      if (message) {
-        message.hidden = false;
-        message.textContent = 'Không tải được Socket.io client. Vui lòng kiểm tra kết nối mạng.';
-      }
-    };
-    document.head.append(script);
-    return;
-  }
-
   const GAME = window.PIXEL_CLASH_DATA;
   if (!GAME) throw new Error('Không tải được shared/game-data.js');
 
   const { WORLD, NETWORK, MAPS, CHARACTERS } = GAME;
-  const socket = window.io(socketEndpoint, {
-    transports: ['polling', 'websocket'],
-    autoConnect: true,
-    reconnection: true,
-    reconnectionAttempts: 20,
-    reconnectionDelay: 1000,
-    auth: { clientVersion: GAME.version }
-  });
-
-  function ensureSocketConnected() {
-    if (!socket.connected && !socket.active) {
-      socket.connect();
-    }
-  }
-
-  // Kết nối socket sớm ngay khi nạp trang để đánh thức server Render kịp thời (khắc phục Cold Start)
-  ensureSocketConnected();
 
   // Optional VFX kitbash registry. Keep every URL inside the owning character
   // folder; preload rejects cross-character paths. Example:
@@ -698,13 +654,13 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
       launch: 'Bắt đầu đấu máy'
     },
     'online-create': {
-      kicker: 'Online host',
-      description: 'Tạo phòng rồi gửi mã 4 số cho bạn bè.',
-      launch: 'Tạo phòng online'
+      kicker: 'p2game Host',
+      description: 'Tạo phòng trực tiếp trên mạng p2game và gửi mã mời cho bạn bè.',
+      launch: 'Tạo phòng p2game'
     },
     'online-join': {
-      kicker: 'Online guest',
-      description: 'Nhập đúng mã 4 số để vào ghế P2.',
+      kicker: 'p2game Guest',
+      description: 'Nhập mã phòng từ bạn bè để so tài trực tiếp trên p2game.',
       launch: 'Vào phòng'
     }
   });
@@ -729,6 +685,9 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
     debug: false,
     game: null,
     scene: null,
+    simRoom: null,
+    p2Room: null,
+    isHost: false,
     cssFullscreen: false,
     phaseHideTimer: 0,
     matchOverTimer: 0,
@@ -959,67 +918,226 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
   ui.mapRailNext.addEventListener('click', () => moveMapRail(1));
 
   ui.roomCodeInput.addEventListener('input', () => {
-    ui.roomCodeInput.value = ui.roomCodeInput.value.replace(/\D/g, '').slice(0, 4);
+    ui.roomCodeInput.value = ui.roomCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
     setMenuError();
   });
 
   async function launchSelectedMode() {
-    ensureSocketConnected();
-    if (!socket.connected) {
-      setLoading(true, 'Máy chủ Render đang thức dậy (Cold Start ~20-30s), vui lòng đợi…');
-      let waitMs = 0;
-      while (!socket.connected && waitMs < 35000) {
-        await new Promise((r) => setTimeout(r, 300));
-        waitMs += 300;
-        if (waitMs % 3000 === 0) {
-          setLoading(true, `Máy chủ đang thức dậy... (${Math.round(waitMs / 1000)}s)`);
-        }
-      }
-      if (!socket.connected) {
-        setLoading(false);
-        setMenuError('Máy chủ phản hồi chậm. Vui lòng bấm thử lại sau ít giây.');
-        return;
-      }
-      setLoading(false);
-    }
     if (!window.Phaser) {
-      setMenuError('Không tải được Phaser 3 từ CDN. Hãy kiểm tra kết nối mạng.');
+      setMenuError('Không tải được Phaser 3. Hãy kiểm tra kết nối mạng.');
       return;
     }
+    const SIM = window.PIXEL_SIM;
+    if (!SIM) {
+      setMenuError('Không tải được sim-engine.js.');
+      return;
+    }
+
     ui.launch.disabled = true;
-    setLoading(true, session.menuMode === 'online-join' ? 'Đang vào phòng…' : 'Đang tạo sân đấu…');
 
-    const callback = (result) => {
-      ui.launch.disabled = false;
-      if (!result?.ok) {
-        setLoading(false);
-        setMenuError(result?.message || 'Không thể bắt đầu trận.');
-        return;
-      }
-      if (!ensureCompatibleVersion(result.state)) return;
-      enterSession(result);
-    };
+    try {
+      if (session.menuMode === 'training' || session.menuMode === 'pve') {
+        const mode = session.menuMode;
+        setLoading(true, mode === 'pve' ? 'Đang tạo phòng đấu máy…' : 'Đang vào sân tập…');
+        const room = SIM.createRoom(mode, 'local', session.picks, {
+          difficulty: mode === 'pve' ? session.aiDifficulty : undefined,
+          mapId: session.mapId
+        });
+        session.simRoom = room;
+        session.isHost = true;
+        session.p2Room = null;
 
-    if (session.menuMode === 'online-join') {
-      const code = ui.roomCodeInput.value.trim();
-      if (!/^\d{4}$/.test(code)) {
+        SIM.startLoop(room, (event, payload) => {
+          if (event === 'room:state') {
+            session.latestState = payload;
+            updateHud(payload);
+            session.scene?.consumeSnapshot(payload);
+          } else if (event === 'combat:event') {
+            session.scene?.handleCombatEvent(payload);
+          } else if (event === 'room:notice') {
+            showToast(payload.message);
+          }
+        });
+
+        enterSession({
+          ok: true,
+          code: room.code,
+          mode,
+          seat: 0,
+          controlledSlots: [0],
+          state: SIM.roomSnapshot(room)
+        });
         ui.launch.disabled = false;
         setLoading(false);
-        setMenuError('Mã phòng phải có đúng 4 chữ số.');
         return;
       }
-      socket.emit('room:join', { code, character: session.picks[0], clientVersion: GAME.version }, callback);
-      return;
-    }
 
-    const mode = session.menuMode === 'online-create' ? 'online' : session.menuMode;
-    socket.emit('room:create', {
-      mode,
-      characters: session.picks,
-      difficulty: mode === 'pve' ? session.aiDifficulty : undefined,
-      mapId: session.mapId,
-      clientVersion: GAME.version
-    }, callback);
+      if (session.menuMode === 'online-create') {
+        setLoading(true, 'Đang tạo phòng trực tiếp trên p2game...');
+        if (!window.p2?.rooms) {
+          throw new Error('p2game rooms SDK chưa sẵn sàng.');
+        }
+
+        const p2Room = await window.p2.rooms.create({ maxPlayers: 2 });
+        await p2Room.setState({
+          mapId: session.mapId,
+          hostCharacter: session.picks[0]
+        });
+        session.p2Room = p2Room;
+        session.isHost = true;
+
+        const room = SIM.createRoom('online', p2Room.selfId, [session.picks[0], null], {
+          mapId: session.mapId,
+          code: p2Room.code
+        });
+        session.simRoom = room;
+
+        // P1 Host starts simulation loop in waiting phase
+        let lastStateSend = 0;
+        SIM.startLoop(room, (event, payload) => {
+          if (event === 'room:state') {
+            session.latestState = payload;
+            updateHud(payload);
+            session.scene?.consumeSnapshot(payload);
+            const now = performance.now();
+            if (now - lastStateSend >= 45) {
+              lastStateSend = now;
+              p2Room.send('room:state', payload).catch(() => {});
+            }
+          } else if (event === 'combat:event') {
+            session.scene?.handleCombatEvent(payload);
+            p2Room.send('combat:event', payload).catch(() => {});
+          } else if (event === 'room:notice') {
+            showToast(payload.message);
+            p2Room.send('room:notice', payload).catch(() => {});
+          }
+        });
+
+        // Listen for Guest events via p2game relay
+        p2Room.on('player:join_info', ({ data }) => {
+          if (data?.character) {
+            room.fighters[1].character = SIM.sanitizeCharacter(data.character);
+            room.phase = 'loading';
+            room.readyPlayers = new Set();
+            if (session.scene) {
+              room.readyPlayers.add(0);
+            }
+            SIM.emitSnapshot(room);
+          }
+        });
+
+        p2Room.on('player:input', ({ data }) => {
+          SIM.handlePlayerInput(room, 1, data?.input, data?.sequence);
+        });
+
+        p2Room.on('player:ready', () => {
+          SIM.handlePlayerReady(room, 1);
+        });
+
+        p2Room.on('match:rematch', () => {
+          SIM.handleRematch(room, 1);
+        });
+
+        p2Room.onPlayerLeave(() => {
+          showToast('Đối thủ đã rời phòng.');
+          leaveSession();
+        });
+
+        enterSession({
+          ok: true,
+          code: p2Room.code,
+          mode: 'online',
+          seat: 0,
+          controlledSlots: [0],
+          state: SIM.roomSnapshot(room)
+        });
+        ui.launch.disabled = false;
+        setLoading(false);
+        return;
+      }
+
+      if (session.menuMode === 'online-join') {
+        const rawCode = ui.roomCodeInput.value.trim().toUpperCase();
+        if (!rawCode) {
+          ui.launch.disabled = false;
+          setLoading(false);
+          setMenuError('Vui lòng nhập mã phòng.');
+          return;
+        }
+
+        setLoading(true, `Đang kết nối vào phòng p2game ${rawCode}…`);
+        if (!window.p2?.rooms) {
+          throw new Error('p2game rooms SDK chưa sẵn sàng.');
+        }
+
+        const p2Room = await window.p2.rooms.join(rawCode);
+        session.p2Room = p2Room;
+        session.isHost = false;
+        session.simRoom = null;
+
+        const hostMapId = p2Room.state?.mapId || session.mapId || 'desert';
+        const hostChar = p2Room.state?.hostCharacter || 'buck';
+        session.mapId = hostMapId;
+        selectMap(hostMapId, false, true);
+
+        p2Room.on('room:state', ({ data }) => {
+          if (data?.mapId && data.mapId !== session.mapId) {
+            session.mapId = data.mapId;
+            selectMap(data.mapId, false, true);
+          }
+          session.latestState = data;
+          updateHud(data);
+          session.scene?.consumeSnapshot(data);
+        });
+
+        p2Room.on('combat:event', ({ data }) => {
+          session.scene?.handleCombatEvent(data);
+        });
+
+        p2Room.on('room:notice', ({ data }) => {
+          showToast(data?.message || '');
+        });
+
+        p2Room.onClose(() => {
+          showToast('Phòng chơi đã đóng hoặc chủ phòng đã rời.');
+          leaveSession();
+        });
+
+        p2Room.onPlayerLeave(() => {
+          showToast('Chủ phòng đã rời.');
+          leaveSession();
+        });
+
+        // Send pick info to Host
+        p2Room.send('player:join_info', { character: session.picks[0] }).catch(() => {});
+
+        enterSession({
+          ok: true,
+          code: p2Room.code,
+          mode: 'online',
+          seat: 1,
+          controlledSlots: [1],
+          state: {
+            code: p2Room.code,
+            mode: 'online',
+            phase: 'loading',
+            round: 1,
+            mapId: hostMapId,
+            fighters: [
+              { slot: 0, character: hostChar, hp: 100, maxHp: 100, x: 780, y: 560, facing: 1, state: 'IDLE' },
+              { slot: 1, character: session.picks[0], hp: 100, maxHp: 100, x: 1140, y: 560, facing: -1, state: 'IDLE' }
+            ]
+          }
+        });
+        ui.launch.disabled = false;
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      ui.launch.disabled = false;
+      setLoading(false);
+      setMenuError(err.message || 'Không thể tạo hoặc vào phòng p2game.');
+    }
   }
 
   ui.launch.addEventListener('click', launchSelectedMode);
@@ -1089,7 +1207,14 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
 
   function leaveSession() {
     window.clearTimeout(session.matchOverTimer);
-    socket.emit('room:leave');
+    if (session.simRoom) {
+      window.PIXEL_SIM?.stopLoop(session.simRoom);
+      session.simRoom = null;
+    }
+    if (session.p2Room) {
+      try { session.p2Room.leave(); } catch (_) {}
+      session.p2Room = null;
+    }
     closeDrawer();
     session.active = false;
     session.mode = null;
@@ -1163,31 +1288,44 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
   }
 
   byId('training-hitboxes').addEventListener('click', toggleHitboxes);
-  byId('training-reset').addEventListener('click', () => socket.emit('training:reset'));
-  byId('training-frame-step').addEventListener('click', () => socket.emit('training:step'));
+  byId('training-reset').addEventListener('click', () => {
+    if (session.simRoom) window.PIXEL_SIM?.handleTrainingReset(session.simRoom);
+  });
+  byId('training-frame-step').addEventListener('click', () => {
+    if (session.simRoom) window.PIXEL_SIM?.handleTrainingStep(session.simRoom);
+  });
   byId('training-ultimate-fill').addEventListener('click', () => {
-    socket.emit('training:ultimate', { full: true }, (result) => {
-      if (result?.ok) showToast('Ultimate P1 đã đầy — nhấn U để thử cinematic.');
-    });
+    if (session.simRoom) {
+      window.PIXEL_SIM?.handleTrainingUltimate(session.simRoom, true);
+      showToast('Ultimate P1 đã đầy — nhấn U để thử cinematic.');
+    }
   });
   byId('training-ultimate-use').addEventListener('click', () => {
     closeDrawer();
-    socket.emit('training:ultimate-use', {}, (result) => {
-      if (!result?.ok) showToast(result?.message || 'Không kích hoạt được Ultimate.');
-    });
+    if (session.simRoom) {
+      const ok = window.PIXEL_SIM?.handleTrainingUltimateUse(session.simRoom);
+      if (!ok) showToast('Không kích hoạt được Ultimate.');
+    }
   });
   byId('training-vfx-showcase').addEventListener('click', () => {
     if (session.mode !== 'training' || !session.scene) return;
     closeDrawer();
     session.scene.runVfxShowcase();
   });
-  ui.rematch.addEventListener('click', () => socket.emit('match:rematch'));
+  ui.rematch.addEventListener('click', () => {
+    if (session.isHost || !session.p2Room) {
+      if (session.simRoom) window.PIXEL_SIM?.handleRematch(session.simRoom, session.seat || 0);
+    } else if (session.p2Room) {
+      session.p2Room.send('match:rematch', {}).catch(() => {});
+      showToast('Đã gửi yêu cầu tái đấu.');
+    }
+  });
 
   document.querySelectorAll('[data-training-setting]').forEach((input) => {
     input.addEventListener('change', () => {
-      socket.emit('training:update', { [input.dataset.trainingSetting]: input.checked }, (result) => {
-        if (!result?.ok) showToast(result?.message || 'Không đổi được training setting.');
-      });
+      if (session.simRoom) {
+        window.PIXEL_SIM?.handleTrainingUpdate(session.simRoom, { [input.dataset.trainingSetting]: input.checked });
+      }
     });
   });
 
@@ -1255,7 +1393,7 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
       toggleFullscreen();
     } else if (event.code === 'KeyR' && session.mode === 'training' && !isTyping()) {
       event.preventDefault();
-      socket.emit('training:reset');
+      if (session.simRoom) window.PIXEL_SIM?.handleTrainingReset(session.simRoom);
     }
   });
 
@@ -1366,38 +1504,15 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
     ui.phaseBanner.hidden = false;
   }
 
-  socket.on('connect', () => {
-    setConnection('online', 'Server sẵn sàng');
-    if (connectionWasLost && session.active) {
-      showToast('Đã kết nối lại. Trận cũ đã hết phiên, hãy vào phòng lại.', 4200);
-      leaveSession();
-    }
-    connectionWasLost = false;
-  });
-  socket.on('disconnect', () => {
-    setConnection('offline', 'Mất kết nối');
-    if (session.active) {
-      connectionWasLost = true;
-      showToast('Mất kết nối server. Nhân vật đã dừng nhận input.', 4000);
-    }
-  });
-  socket.on('connect_error', () => setConnection('offline', 'Không có server'));
-  socket.on('room:notice', ({ message }) => showToast(message));
-  socket.on('room:state', (state) => {
-    if (!session.active || state.code !== session.code) return;
-    if (!ensureCompatibleVersion(state)) return;
-    session.latestState = state;
-    updateHud(state);
-    session.scene?.consumeSnapshot(state);
-  });
-  socket.on('combat:event', (event) => session.scene?.handleCombatEvent(event));
+  setConnection('online', 'p2game sẵn sàng');
 
   window.setInterval(() => {
-    if (!socket.connected) return;
-    const started = performance.now();
-    socket.timeout(1200).emit('net:ping', { clientSentAt: Date.now() }, (error) => {
-      if (!error) ui.debugPing.textContent = `${Math.round(performance.now() - started)} ms`;
-    });
+    if (!session.active) return;
+    if (session.mode === 'training' || session.mode === 'pve') {
+      ui.debugPing.textContent = '0 ms (Local)';
+    } else if (session.p2Room) {
+      ui.debugPing.textContent = session.isHost ? '0 ms (Host)' : '< 20 ms (p2game)';
+    }
   }, 2000);
 
   class PixelClashScene extends Phaser.Scene {
@@ -1507,6 +1622,16 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
       initial?.fighters?.forEach((fighter) => this.ensureView(fighter));
       if (initial) this.consumeSnapshot(initial);
       if (this.assetFailures.length) showToast(`Thiếu ${this.assetFailures.length} asset. Kiểm tra console và đường dẫn folder.`, 5000);
+
+      // Báo hiệu đã hoàn tất nạp texture/animation vào GPU để bắt đầu ván đấu đồng bộ
+      if (!session.reportedReady) {
+        session.reportedReady = true;
+        if (session.isHost || !session.p2Room) {
+          if (session.simRoom) window.PIXEL_SIM?.handlePlayerReady(session.simRoom, 0);
+        } else if (session.p2Room) {
+          session.p2Room.send('player:ready', { slot: 1 }).catch(() => {});
+        }
+      }
     }
 
     buildStage() {
@@ -1732,7 +1857,7 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
     }
 
     sendInputs(time) {
-      if (!socket.connected || !session.active) return;
+      if (!session.active) return;
       session.controlledSlots.forEach((slot) => {
         // Online seats are server-owned, but each physical computer uses the
         // same primary layout. A guest controlling slot 1 must not inherit the
@@ -1742,9 +1867,16 @@ if (typeof window !== 'undefined' && window.p2 && typeof window.p2.init === 'fun
         const previous = session.lastInputSent[slot]?.encoded;
         if (encoded === previous && time - session.lastInputAt[slot] < 120) return;
         session.inputSequence += 1;
-        socket.emit('player:input', { slot, sequence: session.inputSequence, input });
         session.lastInputSent[slot] = { encoded };
         session.lastInputAt[slot] = time;
+
+        if (session.isHost || !session.p2Room) {
+          if (session.simRoom) {
+            window.PIXEL_SIM?.handlePlayerInput(session.simRoom, slot, input, session.inputSequence);
+          }
+        } else if (session.p2Room) {
+          session.p2Room.send('player:input', { slot, sequence: session.inputSequence, input }).catch(() => {});
+        }
       });
     }
 

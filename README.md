@@ -1,4 +1,4 @@
-# Pixel Clash Dojo v3.1.8
+# Pixel Clash Dojo v3.1.9
 gameDemo: https://pixelclashfightgame.onrender.com
 
 Prototype game đối kháng pixel 2D 1v1 chạy trên trình duyệt. Phaser 3 phụ trách input/render; Node.js + Express + Socket.io giữ mô phỏng authoritative 60 Hz, room và multiplayer. Client chỉ gửi phím đang giữ, không gửi tọa độ hoặc damage.

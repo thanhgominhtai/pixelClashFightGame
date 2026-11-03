@@ -1,13 +1,13 @@
 {
   "name": "pixel-clash-lab",
-  "version": "3.1.8",
+  "version": "3.1.9",
   "private": true,
   "description": "Phaser 3 + Express + Socket.io 1v1 fighting-game prototype",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node --check public/shared/game-data.js && node --check public/game.js && node --check scripts/smoke_combat.js && node scripts/validate_roster.js",
+    "check": "node --check server.js && node --check public/shared/game-data.js && node --check public/shared/sim-engine.js && node --check public/game.js && node --check scripts/smoke_combat.js && node scripts/validate_roster.js",
     "test:combat": "node scripts/smoke_combat.js",
     "build:characters": "python scripts/build_character_sheets.py",
     "validate:roster": "node scripts/validate_roster.js",
