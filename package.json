@@ -1,6 +1,6 @@
 {
   "name": "pixel-clash-lab",
-  "version": "3.1.6",
+  "version": "3.1.7",
   "private": true,
   "description": "Phaser 3 + Express + Socket.io 1v1 fighting-game prototype",
   "main": "server.js",
