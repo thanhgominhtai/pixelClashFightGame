@@ -10,7 +10,6 @@
   if (!GAME) throw new Error('PIXEL_CLASH_DATA is required for sim-engine');
 
 const { WORLD, NETWORK, MAPS, CHARACTERS, DODGES, ULTIMATE } = GAME;
-const PORT = Number(process.env.PORT || 3000);
 const FRAME_MS = 1000 / NETWORK.tickRate;
 const SNAPSHOT_EVERY = Math.max(1, Math.round(NETWORK.tickRate / NETWORK.snapshotRate));
 const CHARGED_SPECIAL_WIDTH_MULTIPLIER = 2.15;

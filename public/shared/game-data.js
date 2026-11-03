@@ -915,5 +915,5 @@
     teleport: Object.freeze({ total: 22, invulnerable: 16, distance: 210, warpFrame: 8, cooldown: 72 })
   });
 
-  return Object.freeze({ version: '3.1.9', WORLD, NETWORK, CONTROLS, MAPS, CHARACTERS, DODGES, ULTIMATE });
+  return Object.freeze({ version: '3.2.0', WORLD, NETWORK, CONTROLS, MAPS, CHARACTERS, DODGES, ULTIMATE });
 }));
